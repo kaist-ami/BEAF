@@ -6,6 +6,8 @@ def load_json(path):
         return json.load(f)
     
 def answer_check(beaf_qna, model_answers):
+    if len(beaf_qna) != len(model_answers):
+        raise ValueError(f"Model answer count ({len(model_answers)}) must match question count ({len(beaf_qna)}).")
     orig_pairs = {}
     for (q, a) in zip(beaf_qna, model_answers):
         assert q['id'] == a['id']
@@ -55,18 +57,21 @@ def metric(orig_pairs, total_qna):
                 if ori_ans[0] != tot['answer'][0]:
                     cnt['ID'] += 1
 
-    assert cnt['TP'] + cnt['FP'] + cnt['TN'] + cnt['FN'] == 26118
-    assert cnt['TU'] + cnt['IG'] + cnt['SBp'] + cnt['SBn'] == 1727
+    n_total = cnt['TP'] + cnt['FP'] + cnt['TN'] + cnt['FN']
+    # The four outcomes partition removed-object pairs with yes/no ground truth.
+    # Version 0 also marks some yes/yes pairs, which are excluded by conv.
+    n_pairs = cnt['TU'] + cnt['IG'] + cnt['SBp'] + cnt['SBn']
+    assert n_total == len(total_qna)
     
-    acc = (cnt['TP'] + cnt['TN']) / (cnt['TP'] + cnt['FP'] + cnt['TN'] + cnt['FN']) * 100
+    acc = (cnt['TP'] + cnt['TN']) / n_total * 100
     precision = cnt['TP'] / (cnt['TP'] + cnt['FP']) * 100
     recall = cnt['TP'] / (cnt['TP'] + cnt['FN']) * 100
     f1 = 2 * precision * recall / (precision + recall)
 
-    tu = cnt['TU'] / 1727 * 100
-    ig = cnt['IG'] / 1727 * 100
-    sbp = cnt['SBp'] / 1727 * 100
-    sbn = cnt['SBn'] / 1727 * 100
+    tu = cnt['TU'] / n_pairs * 100
+    ig = cnt['IG'] / n_pairs * 100
+    sbp = cnt['SBp'] / n_pairs * 100
+    sbn = cnt['SBn'] / n_pairs * 100
     id_ = cnt['ID'] / id_tot * 100
     f1_tuid = 2*tu*(100-id_) / (tu + (100-id_))
     return acc, precision, recall, f1, tu, ig, sbp, sbn, id_, f1_tuid
